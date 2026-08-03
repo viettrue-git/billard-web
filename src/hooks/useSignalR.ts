@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { useTableStore } from '../store/tableStore';
-import { BilliardTable } from '../types';
+import type { BilliardTable } from '../types';
 
 const HUB_URL = import.meta.env.VITE_HUB_URL || 'http://localhost:5001/hubs/tables';
 

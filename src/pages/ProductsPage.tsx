@@ -3,7 +3,7 @@ import { Table, Button, Modal, Form, Input, Select, InputNumber, Tag, Space, mes
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, getCategories, createProduct, updateProduct, deleteProduct } from '../api/products';
-import { Product } from '../types';
+import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
 
 export default function ProductsPage() {

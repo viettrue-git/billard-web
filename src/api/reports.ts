@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiResponse, DailyReport } from '../types';
+import type { ApiResponse, DailyReport } from '../types';
 
 export const getDailyReport = async (date?: string) => {
   const res = await api.get<ApiResponse<DailyReport>>('/reports/daily', { params: { date } });

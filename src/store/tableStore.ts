@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BilliardTable } from '../types';
+import type { BilliardTable } from '../types';
 
 interface TableState {
   tables: BilliardTable[];

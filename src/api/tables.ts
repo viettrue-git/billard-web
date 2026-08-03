@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiResponse, BilliardTable, TableSession } from '../types';
+import type { ApiResponse, BilliardTable, TableSession } from '../types';
 
 export const getTables = async () => {
   const res = await api.get<ApiResponse<BilliardTable[]>>('/tables');

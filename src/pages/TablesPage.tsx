@@ -9,7 +9,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTables, openTable, closeTable, getTableSession, addOrder } from '../api/tables';
 import { getProducts } from '../api/products';
-import { BilliardTable, TableSession } from '../types';
+import type { BilliardTable, TableSession } from '../types';
 import { formatCurrency, calcCurrentAmount } from '../utils/format';
 import { useSignalR } from '../hooks/useSignalR';
 

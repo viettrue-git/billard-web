@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiResponse, Reservation } from '../types';
+import type { ApiResponse, Reservation } from '../types';
 
 export const getReservations = async (status?: string) => {
   const res = await api.get<ApiResponse<Reservation[]>>('/reservations', { params: { status } });

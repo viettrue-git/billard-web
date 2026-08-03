@@ -3,7 +3,7 @@ import { Table, Button, Modal, Form, Input, Select, DatePicker, Space, Popconfir
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getEmployees, createEmployee, deleteEmployee } from '../api/employees';
-import { Employee } from '../types';
+import type { Employee } from '../types';
 
 export default function EmployeesPage() {
   const [modalOpen, setModalOpen] = useState(false);

@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiResponse, Employee } from '../types';
+import type { ApiResponse, Employee } from '../types';
 
 export const getEmployees = async () => {
   const res = await api.get<ApiResponse<Employee[]>>('/employees');

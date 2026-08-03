@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiResponse, Product, ProductCategory } from '../types';
+import type { ApiResponse, Product, ProductCategory } from '../types';
 
 export const getProducts = async (categoryId?: string) => {
   const res = await api.get<ApiResponse<Product[]>>('/products', { params: { categoryId } });
