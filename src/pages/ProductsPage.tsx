@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, InputNumber, Tag, Space, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, InputNumber, Space, message, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, getCategories, createProduct, updateProduct, deleteProduct } from '../api/products';

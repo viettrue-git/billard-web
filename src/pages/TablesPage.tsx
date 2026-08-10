@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Row, Col, Card, Badge, Button, Modal, Form, Input, Select, InputNumber,
-  message, Spin, Tag, Space, Statistic, Divider, List, Typography, Radio
+  Row, Col, Card, Button, Modal, Form, Input, Select, InputNumber, DatePicker,
+  message, Spin, Tag, Statistic, Divider, List, Typography, Radio, Popconfirm, Result, Empty
 } from 'antd';
 import {
-  ClockCircleOutlined, DollarOutlined, PlusOutlined, CloseCircleOutlined, ShoppingCartOutlined
+  DollarOutlined, PlusOutlined, EditOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getTables, openTable, closeTable, getTableSession, addOrder } from '../api/tables';
+import dayjs from 'dayjs';
+import { getTables, openTable, closeTable, getTableSession, addOrder, updateOrderItem, deleteOrderItem, updateTablePrice } from '../api/tables';
 import { getProducts } from '../api/products';
 import type { BilliardTable, TableSession } from '../types';
 import { formatCurrency, calcCurrentAmount } from '../utils/format';
 import { useSignalR } from '../hooks/useSignalR';
+import { useAuthStore } from '../store/authStore';
 
 const { Text, Title } = Typography;
 
@@ -22,6 +24,12 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   Maintenance: { color: 'gray', label: 'Bảo trì' },
 };
 
+const paymentMethodLabel: Record<string, string> = {
+  Cash: 'Tiền mặt',
+  Card: 'Thẻ',
+  Transfer: 'Chuyển khoản',
+};
+
 export default function TablesPage() {
   const [selectedTable, setSelectedTable] = useState<BilliardTable | null>(null);
   const [sessionModal, setSessionModal] = useState(false);
@@ -29,9 +37,13 @@ export default function TablesPage() {
   const [orderModal, setOrderModal] = useState(false);
   const [currentSession, setCurrentSession] = useState<TableSession | null>(null);
   const [timer, setTimer] = useState<Record<string, number>>({});
+  const [priceTarget, setPriceTarget] = useState<BilliardTable | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState<{ tableNumber: string; finalAmount: number; paymentMethod: string } | null>(null);
   const [openForm] = Form.useForm();
   const [closeForm] = Form.useForm();
+  const [priceForm] = Form.useForm();
   const qc = useQueryClient();
+  const isAdmin = useAuthStore((s) => s.isAdmin());
 
   useSignalR();
 
@@ -61,7 +73,7 @@ export default function TablesPage() {
   }, [tables]);
 
   const openMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes?: string }) => openTable(id, notes),
+    mutationFn: ({ id, notes, openedAt }: { id: string; notes?: string; openedAt?: string }) => openTable(id, notes, openedAt),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tables'] }); message.success('Đã mở bàn!'); setSessionModal(false); openForm.resetFields(); },
     onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi mở bàn'),
   });
@@ -69,7 +81,17 @@ export default function TablesPage() {
   const closeMutation = useMutation({
     mutationFn: ({ id, discount, payment }: { id: string; discount: number; payment: string }) =>
       closeTable(id, discount, payment),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tables'] }); message.success('Thanh toán thành công!'); setCloseModal(false); setCurrentSession(null); closeForm.resetFields(); },
+    onSuccess: (session, variables) => {
+      qc.invalidateQueries({ queryKey: ['tables'] });
+      setCloseModal(false);
+      setCurrentSession(null);
+      closeForm.resetFields();
+      setPaymentSuccess({
+        tableNumber: session.tableNumber,
+        finalAmount: (session.totalAmount ?? 0) - variables.discount,
+        paymentMethod: variables.payment,
+      });
+    },
     onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi thanh toán'),
   });
 
@@ -80,6 +102,25 @@ export default function TablesPage() {
     onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi'),
   });
 
+  const updateOrderItemMutation = useMutation({
+    mutationFn: ({ orderItemId, quantity }: { orderItemId: string; quantity: number }) =>
+      updateOrderItem(currentSession!.id, orderItemId, quantity),
+    onSuccess: (session) => setCurrentSession(session),
+    onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi cập nhật sản phẩm'),
+  });
+
+  const deleteOrderItemMutation = useMutation({
+    mutationFn: (orderItemId: string) => deleteOrderItem(currentSession!.id, orderItemId),
+    onSuccess: (session) => { setCurrentSession(session); message.success('Đã xóa sản phẩm!'); },
+    onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi xóa sản phẩm'),
+  });
+
+  const priceMutation = useMutation({
+    mutationFn: ({ id, hourlyRate }: { id: string; hourlyRate: number }) => updateTablePrice(id, hourlyRate),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tables'] }); message.success('Đã cập nhật giá bàn!'); setPriceTarget(null); },
+    onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi cập nhật giá bàn'),
+  });
+
   const handleTableClick = async (table: BilliardTable) => {
     setSelectedTable(table);
     if (table.status === 'Occupied') {
@@ -87,6 +128,7 @@ export default function TablesPage() {
       setCurrentSession(session);
       setCloseModal(true);
     } else if (table.status === 'Available') {
+      openForm.setFieldsValue({ openedAt: dayjs() });
       setSessionModal(true);
     }
   };
@@ -118,9 +160,22 @@ export default function TablesPage() {
                 <Card
                   hoverable
                   onClick={() => handleTableClick(table)}
-                  style={{ borderTop: `4px solid ${cfg.color}`, cursor: 'pointer', textAlign: 'center' }}
+                  style={{ borderTop: `4px solid ${cfg.color}`, cursor: 'pointer', textAlign: 'center', position: 'relative' }}
                   bodyStyle={{ padding: 12 }}
                 >
+                  {isAdmin && (
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      style={{ position: 'absolute', top: 4, right: 4 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPriceTarget(table);
+                        priceForm.setFieldsValue({ hourlyRate: table.hourlyRate });
+                      }}
+                    />
+                  )}
                   <Title level={4} style={{ margin: 0 }}>{table.tableNumber}</Title>
                   <Tag color={cfg.color}>{cfg.label}</Tag>
                   {table.tableType === 'VIP' && <Tag color="gold" style={{ marginLeft: 4 }}>VIP</Tag>}
@@ -146,7 +201,28 @@ export default function TablesPage() {
         onCancel={() => setSessionModal(false)}
         footer={null}
       >
-        <Form form={openForm} layout="vertical" onFinish={(v) => openMutation.mutate({ id: selectedTable!.id, notes: v.notes })}>
+        <Form
+          form={openForm}
+          layout="vertical"
+          onFinish={(v) => openMutation.mutate({
+            id: selectedTable!.id,
+            notes: v.notes,
+            openedAt: (v.openedAt as dayjs.Dayjs | undefined)?.toISOString(),
+          })}
+        >
+          <Form.Item
+            label="Giờ mở bàn"
+            name="openedAt"
+            rules={[{ required: true, message: 'Vui lòng chọn giờ mở bàn' }]}
+            tooltip="Có thể chọn giờ trong quá khứ (tối đa 24 giờ) nếu khách đã vào chơi trước khi bấm mở bàn"
+          >
+            <DatePicker
+              showTime
+              format="DD/MM/YYYY HH:mm"
+              style={{ width: '100%' }}
+              disabledDate={(d) => !!d && (d.isAfter(dayjs(), 'day') || d.isBefore(dayjs().subtract(24, 'hour'), 'day'))}
+            />
+          </Form.Item>
           <Form.Item label="Ghi chú" name="notes">
             <Input.TextArea rows={2} placeholder="Ghi chú (tuỳ chọn)" />
           </Form.Item>
@@ -176,14 +252,51 @@ export default function TablesPage() {
             <List
               size="small"
               dataSource={currentSession.orderItems}
+              locale={{ emptyText: <Empty description="Chưa có đồ uống / thức ăn" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
               renderItem={(item) => (
-                <List.Item extra={<Text strong>{formatCurrency(item.total)}</Text>}>
-                  {item.productName} x{item.quantity}
+                <List.Item key={item.id} style={{ padding: '8px 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text strong ellipsis style={{ display: 'block' }}>{item.productName}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{formatCurrency(item.unitPrice)}/đơn vị</Text>
+                    </div>
+                    <InputNumber
+                      size="small"
+                      min={1}
+                      max={999}
+                      value={item.quantity}
+                      disabled={updateOrderItemMutation.isPending}
+                      onChange={(value) => {
+                        if (value && value !== item.quantity) {
+                          updateOrderItemMutation.mutate({ orderItemId: item.id, quantity: value });
+                        }
+                      }}
+                      style={{ width: 64 }}
+                      aria-label={`Số lượng ${item.productName}`}
+                    />
+                    <Text strong style={{ width: 110, textAlign: 'right', flexShrink: 0 }}>{formatCurrency(item.total)}</Text>
+                    <Popconfirm
+                      title="Xóa sản phẩm này khỏi hóa đơn?"
+                      okText="Xóa"
+                      cancelText="Hủy"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => deleteOrderItemMutation.mutate(item.id)}
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        loading={deleteOrderItemMutation.isPending && deleteOrderItemMutation.variables === item.id}
+                        aria-label={`Xóa ${item.productName}`}
+                      />
+                    </Popconfirm>
+                  </div>
                 </List.Item>
               )}
               footer={<Text strong>Tổng F&B: {formatCurrency(currentSession.orderItems.reduce((s, i) => s + i.total, 0))}</Text>}
             />
-            <Button icon={<PlusOutlined />} onClick={() => setOrderModal(true)} style={{ marginBottom: 16 }}>
+            <Button icon={<PlusOutlined />} onClick={() => setOrderModal(true)} style={{ marginBottom: 16, marginTop: 8 }}>
               Thêm đồ uống
             </Button>
             <Divider>Thanh toán</Divider>
@@ -213,17 +326,75 @@ export default function TablesPage() {
       </Modal>
 
       {/* Modal Thêm đồ uống */}
-      <Modal title="Thêm sản phẩm" open={orderModal} onCancel={() => setOrderModal(false)} footer={null}>
+      <Modal title="Thêm sản phẩm" open={orderModal} onCancel={() => setOrderModal(false)} footer={null} destroyOnHidden>
         <Form layout="vertical" onFinish={(v) => { orderMutation.mutate({ sessionId: currentSession!.id, productId: v.productId, quantity: v.quantity }); setOrderModal(false); }}>
           <Form.Item label="Sản phẩm" name="productId" rules={[{ required: true }]}>
-            <Select placeholder="Chọn sản phẩm" showSearch optionFilterProp="label"
+            <Select placeholder="Chọn sản phẩm" showSearch optionFilterProp="label" disabled={orderMutation.isPending}
               options={products.map((p) => ({ value: p.id, label: `${p.name} - ${formatCurrency(p.price)}/${p.unit}` }))} />
           </Form.Item>
           <Form.Item label="Số lượng" name="quantity" initialValue={1} rules={[{ required: true }]}>
-            <InputNumber min={1} max={100} style={{ width: '100%' }} />
+            <InputNumber min={1} max={100} style={{ width: '100%' }} disabled={orderMutation.isPending} />
           </Form.Item>
-          <Button type="primary" htmlType="submit" block>Thêm</Button>
+          <Button type="primary" htmlType="submit" block loading={orderMutation.isPending} disabled={orderMutation.isPending}>Thêm</Button>
         </Form>
+      </Modal>
+
+      {/* Modal Sửa giá bàn (Admin) */}
+      <Modal
+        title={`Sửa giá bàn ${priceTarget?.tableNumber}`}
+        open={!!priceTarget}
+        onCancel={() => setPriceTarget(null)}
+        footer={null}
+      >
+        <Form
+          form={priceForm}
+          layout="vertical"
+          onFinish={(v) => priceMutation.mutate({ id: priceTarget!.id, hourlyRate: v.hourlyRate })}
+        >
+          <Form.Item
+            label="Giá thuê theo giờ (VND)"
+            name="hourlyRate"
+            rules={[{ required: true, message: 'Vui lòng nhập giá thuê bàn' }]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              min={1}
+              step={5000}
+              formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block loading={priceMutation.isPending}>
+              Cập nhật giá
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Thông báo thanh toán thành công */}
+      <Modal
+        open={!!paymentSuccess}
+        onCancel={() => setPaymentSuccess(null)}
+        footer={null}
+        width={420}
+        centered
+      >
+        {paymentSuccess && (
+          <Result
+            status="success"
+            title="Thanh toán thành công!"
+            subTitle={
+              <>
+                Bàn {paymentSuccess.tableNumber} · {formatCurrency(paymentSuccess.finalAmount)} · {paymentMethodLabel[paymentSuccess.paymentMethod]}
+              </>
+            }
+            extra={
+              <Button type="primary" onClick={() => setPaymentSuccess(null)}>
+                Đóng
+              </Button>
+            }
+          />
+        )}
       </Modal>
     </div>
   );

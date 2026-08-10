@@ -101,6 +101,21 @@ export interface Employee {
   isActive: boolean;
 }
 
+export interface Invoice {
+  id: string;
+  sessionId: string;
+  tableNumber: string;
+  sessionAmount: number;
+  foodAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  totalMinutes?: number;
+  paymentMethod: PaymentMethod;
+  paidAt: string;
+  cashierName: string;
+  orderItems: OrderItem[];
+}
+
 export interface DailyReport {
   date: string;
   totalRevenue: number;

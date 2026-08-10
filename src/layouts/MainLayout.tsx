@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Button, theme } from 'antd';
 import {
   TableOutlined,
@@ -6,6 +6,7 @@ import {
   ShoppingOutlined,
   TeamOutlined,
   BarChartOutlined,
+  HistoryOutlined,
   LogoutOutlined,
   UserOutlined,
   MenuFoldOutlined,
@@ -22,6 +23,7 @@ const menuItems = [
   { key: '/products', icon: <ShoppingOutlined />, label: 'Sản phẩm' },
   { key: '/employees', icon: <TeamOutlined />, label: 'Nhân viên' },
   { key: '/reports', icon: <BarChartOutlined />, label: 'Báo cáo' },
+  { key: '/invoices', icon: <HistoryOutlined />, label: 'Lịch sử thanh toán' },
 ];
 
 export default function MainLayout() {

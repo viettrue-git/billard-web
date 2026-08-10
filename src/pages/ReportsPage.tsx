@@ -49,7 +49,7 @@ export default function ReportsPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
+              <Tooltip formatter={(v?: number) => formatCurrency(v ?? 0)} />
               <Legend />
               <Bar dataKey="Tiền bàn" fill="#1890ff" />
               <Bar dataKey="Đồ uống" fill="#52c41a" />

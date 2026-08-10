@@ -6,7 +6,6 @@ import { getReservations, createReservation, updateReservationStatus } from '../
 import { getTables } from '../api/tables';
 import type { Reservation } from '../types';
 import { formatCurrency } from '../utils/format';
-import dayjs from 'dayjs';
 
 const statusColor: Record<string, string> = {
   Pending: 'orange', Confirmed: 'green', Cancelled: 'red', Completed: 'blue'
