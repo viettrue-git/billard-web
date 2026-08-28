@@ -22,6 +22,7 @@ export interface ActiveSession {
   openedAt: string;
   openedByName: string;
   currentAmount: number;
+  foodAmount: number;
 }
 
 export interface BilliardTable {
@@ -123,4 +124,31 @@ export interface DailyReport {
   foodRevenue: number;
   totalSessions: number;
   totalOrders: number;
+  purchaseAmount: number;
+}
+
+export interface StockImportItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+}
+
+export interface StockImport {
+  id: string;
+  importDate: string;
+  supplierName: string;
+  totalAmount: number;
+  note?: string;
+  createdByName: string;
+  isVoided: boolean;
+  items: StockImportItem[];
+}
+
+export interface CreateStockImportRequest {
+  importDate?: string;
+  supplierName: string;
+  note?: string;
+  items: { productId: string; quantity: number; unitPrice: number }[];
 }

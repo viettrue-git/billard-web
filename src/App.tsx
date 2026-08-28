@@ -11,6 +11,7 @@ import ProductsPage from './pages/ProductsPage';
 import EmployeesPage from './pages/EmployeesPage';
 import ReportsPage from './pages/ReportsPage';
 import InvoiceHistoryPage from './pages/InvoiceHistoryPage';
+import StockImportsPage from './pages/StockImportsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
@@ -35,6 +36,7 @@ export default function App() {
                 <Route index element={<TablesPage />} />
                 <Route path="reservations" element={<ReservationsPage />} />
                 <Route path="products" element={<ProductsPage />} />
+                <Route path="stock-imports" element={<StockImportsPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="invoices" element={<InvoiceHistoryPage />} />

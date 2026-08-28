@@ -4,7 +4,7 @@ import {
   message, Spin, Tag, Statistic, Divider, List, Typography, Radio, Popconfirm, Result, Empty
 } from 'antd';
 import {
-  DollarOutlined, PlusOutlined, EditOutlined, DeleteOutlined
+  DollarOutlined, PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleFilled
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -39,6 +39,7 @@ export default function TablesPage() {
   const [timer, setTimer] = useState<Record<string, number>>({});
   const [priceTarget, setPriceTarget] = useState<BilliardTable | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<{ tableNumber: string; finalAmount: number; paymentMethod: string } | null>(null);
+  const [paymentPreview, setPaymentPreview] = useState<{ tableAmount: number; foodAmount: number; discount: number; finalAmount: number; payment: string } | null>(null);
   const [openForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [priceForm] = Form.useForm();
@@ -85,6 +86,7 @@ export default function TablesPage() {
       qc.invalidateQueries({ queryKey: ['tables'] });
       setCloseModal(false);
       setCurrentSession(null);
+      setPaymentPreview(null);
       closeForm.resetFields();
       setPaymentSuccess({
         tableNumber: session.tableNumber,
@@ -92,7 +94,7 @@ export default function TablesPage() {
         paymentMethod: variables.payment,
       });
     },
-    onError: (e: any) => message.error(e.response?.data?.message || 'Lỗi thanh toán'),
+    onError: (e: any) => { setPaymentPreview(null); message.error(e.response?.data?.message || 'Lỗi thanh toán'); },
   });
 
   const orderMutation = useMutation({
@@ -134,7 +136,10 @@ export default function TablesPage() {
   };
 
   const totalOccupied = tables.filter((t) => t.status === 'Occupied').length;
-  const totalRevenue = Object.values(timer).reduce((a, b) => a + b, 0);
+  const totalRevenue = tables.reduce((sum, t) => {
+    const tableAmount = timer[t.id] ?? t.currentSession?.currentAmount ?? 0;
+    return sum + tableAmount + (t.currentSession?.foodAmount ?? 0);
+  }, 0);
 
   return (
     <div>
@@ -154,7 +159,9 @@ export default function TablesPage() {
         <Row gutter={[16, 16]}>
           {tables.map((table) => {
             const cfg = statusConfig[table.status];
-            const amount = timer[table.id] ?? table.currentSession?.currentAmount ?? 0;
+            const tableAmount = timer[table.id] ?? table.currentSession?.currentAmount ?? 0;
+            const foodAmount = table.currentSession?.foodAmount ?? 0;
+            const totalAmount = tableAmount + foodAmount;
             return (
               <Col key={table.id} xs={12} sm={8} md={6} lg={4}>
                 <Card
@@ -183,8 +190,14 @@ export default function TablesPage() {
                     {formatCurrency(table.hourlyRate)}/giờ
                   </div>
                   {table.status === 'Occupied' && (
-                    <div style={{ marginTop: 4, color: '#cf1322', fontWeight: 'bold' }}>
-                      {formatCurrency(amount)}
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ color: '#cf1322', fontWeight: 'bold' }}>
+                        {formatCurrency(totalAmount)}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#888' }}>
+                        Bàn {formatCurrency(tableAmount)}
+                        {foodAmount > 0 && ` · DV ${formatCurrency(foodAmount)}`}
+                      </div>
                     </div>
                   )}
                 </Card>
@@ -317,11 +330,91 @@ export default function TablesPage() {
                   </Form.Item>
                 </Col>
               </Row>
-              <Button type="primary" danger htmlType="submit" block loading={closeMutation.isPending} icon={<DollarOutlined />}>
+              <Button
+                type="primary"
+                danger
+                htmlType="button"
+                block
+                icon={<DollarOutlined />}
+                onClick={() => {
+                  const tableAmount = timer[selectedTable?.id ?? ''] ?? 0;
+                  const foodAmount = currentSession.orderItems.reduce((s, i) => s + i.total, 0);
+                  const discount = closeForm.getFieldValue('discount') ?? 0;
+                  const payment = closeForm.getFieldValue('payment') ?? 'Cash';
+                  const finalAmount = tableAmount + foodAmount - discount;
+                  setPaymentPreview({ tableAmount, foodAmount, discount, finalAmount, payment });
+                }}
+              >
                 Thanh toán & Đóng bàn
               </Button>
             </Form>
           </>
+        )}
+      </Modal>
+
+      {/* Modal xác nhận thanh toán */}
+      <Modal
+        open={!!paymentPreview}
+        onCancel={() => setPaymentPreview(null)}
+        footer={null}
+        width={440}
+        centered
+        maskClosable={false}
+        closable={!closeMutation.isPending}
+        destroyOnHidden
+      >
+        {paymentPreview && (
+          <div style={{ textAlign: 'center', padding: '8px 4px 0' }}>
+            <div
+              style={{
+                width: 64, height: 64, borderRadius: '50%', background: '#fff1f0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+              }}
+            >
+              <ExclamationCircleFilled style={{ fontSize: 32, color: '#cf1322' }} />
+            </div>
+            <Title level={4} style={{ marginBottom: 4 }}>Xác nhận thanh toán</Title>
+            <Text type="secondary">Bàn {selectedTable?.tableNumber} · {paymentMethodLabel[paymentPreview.payment]}</Text>
+
+            <div style={{ background: '#fafafa', borderRadius: 12, padding: '16px 20px', margin: '20px 0', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text type="secondary">Tiền bàn</Text>
+                <Text>{formatCurrency(paymentPreview.tableAmount)}</Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: paymentPreview.discount > 0 ? 8 : 0 }}>
+                <Text type="secondary">Đồ uống & thức ăn</Text>
+                <Text>{formatCurrency(paymentPreview.foodAmount)}</Text>
+              </div>
+              {paymentPreview.discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Text type="secondary">Giảm giá</Text>
+                  <Text style={{ color: '#cf1322' }}>-{formatCurrency(paymentPreview.discount)}</Text>
+                </div>
+              )}
+              <Divider style={{ margin: '12px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text strong style={{ fontSize: 15 }}>Khách cần trả</Text>
+                <Text strong style={{ fontSize: 24, color: '#cf1322' }}>{formatCurrency(paymentPreview.finalAmount)}</Text>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <Button size="large" block disabled={closeMutation.isPending} onClick={() => setPaymentPreview(null)}>
+                Hủy
+              </Button>
+              <Button
+                type="primary"
+                danger
+                size="large"
+                block
+                icon={<DollarOutlined />}
+                loading={closeMutation.isPending}
+                onClick={() => closeForm.submit()}
+              >
+                Xác nhận
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 

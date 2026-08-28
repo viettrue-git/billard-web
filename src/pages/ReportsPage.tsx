@@ -21,20 +21,24 @@ export default function ReportsPage() {
 
   const totalRevenue = monthly.reduce((s, d) => s + d.totalRevenue, 0);
   const totalSessions = monthly.reduce((s, d) => s + d.totalSessions, 0);
+  const totalPurchase = monthly.reduce((s, d) => s + d.purchaseAmount, 0);
 
   const chartData = monthly.map((d) => ({
     date: d.date.slice(-2),
-    'Tiền bàn': d.tableRevenue,
-    'Đồ uống': d.foodRevenue,
+    'Doanh thu': d.tableRevenue + d.foodRevenue,
+    'Tiền nhập hàng': d.purchaseAmount,
   }));
 
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}><Card><Statistic title="DT hôm nay" value={formatCurrency(today?.totalRevenue ?? 0)} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Sessions hôm nay" value={today?.totalSessions ?? 0} /></Card></Col>
-        <Col span={6}><Card><Statistic title="DT tháng này" value={formatCurrency(totalRevenue)} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Sessions tháng này" value={totalSessions} /></Card></Col>
+        <Col span={12}><Card><Statistic title="DT hôm nay" value={formatCurrency(today?.totalRevenue ?? 0)} /></Card></Col>
+        <Col span={12}><Card><Statistic title="Sessions hôm nay" value={today?.totalSessions ?? 0} /></Card></Col>
+      </Row>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={8}><Card><Statistic title="DT tháng này" value={formatCurrency(totalRevenue)} /></Card></Col>
+        <Col span={8}><Card><Statistic title="Sessions tháng này" value={totalSessions} /></Card></Col>
+        <Col span={8}><Card><Statistic title="Tiền nhập hàng tháng này" value={formatCurrency(totalPurchase)} /></Card></Col>
       </Row>
 
       <Card title={
@@ -51,8 +55,8 @@ export default function ReportsPage() {
               <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
               <Tooltip formatter={(v?: number) => formatCurrency(v ?? 0)} />
               <Legend />
-              <Bar dataKey="Tiền bàn" fill="#1890ff" />
-              <Bar dataKey="Đồ uống" fill="#52c41a" />
+              <Bar dataKey="Doanh thu" fill="#1890ff" />
+              <Bar dataKey="Tiền nhập hàng" fill="#fa8c16" />
             </BarChart>
           </ResponsiveContainer>
         )}
