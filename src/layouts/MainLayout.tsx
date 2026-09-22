@@ -12,9 +12,11 @@ import {
   UserOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import ChangeManagerPinModal from '../components/ChangeManagerPinModal';
 
 const { Header, Sider, Content } = Layout;
 
@@ -30,6 +32,7 @@ const menuItems = [
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin } = useAuthStore();
@@ -40,6 +43,15 @@ export default function MainLayout() {
     : menuItems.filter((i) => ['/', '/reservations'].includes(i.key));
 
   const userMenuItems = [
+    // Chỉ Admin được đặt/đổi mã PIN dùng chung cho các chức năng nhạy cảm.
+    ...(isAdmin()
+      ? [{
+          key: 'manager-pin',
+          icon: <LockOutlined />,
+          label: 'Mã PIN quản lý',
+          onClick: () => setPinModalOpen(true),
+        }]
+      : []),
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -89,6 +101,8 @@ export default function MainLayout() {
           <Outlet />
         </Content>
       </Layout>
+
+      <ChangeManagerPinModal open={pinModalOpen} onClose={() => setPinModalOpen(false)} />
     </Layout>
   );
 }

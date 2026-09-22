@@ -3,20 +3,23 @@ import { Row, Col, Card, Statistic, DatePicker, Spin } from 'antd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { getMonthlyReport, getDailyReport } from '../api/reports';
+import { useManagerPinStore } from '../store/managerPinStore';
 import { formatCurrency } from '../utils/format';
 import dayjs, { Dayjs } from 'dayjs';
 
 export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
+  // ManagerPinGate đảm bảo trang chỉ render khi đã có PIN hợp lệ.
+  const pin = useManagerPinStore((s) => s.pin) ?? '';
 
   const { data: monthly = [], isLoading } = useQuery({
     queryKey: ['reports-monthly', selectedMonth.year(), selectedMonth.month() + 1],
-    queryFn: () => getMonthlyReport(selectedMonth.year(), selectedMonth.month() + 1),
+    queryFn: () => getMonthlyReport(pin, selectedMonth.year(), selectedMonth.month() + 1),
   });
 
   const { data: today } = useQuery({
     queryKey: ['reports-daily', dayjs().format('YYYY-MM-DD')],
-    queryFn: () => getDailyReport(dayjs().format('YYYY-MM-DD')),
+    queryFn: () => getDailyReport(pin, dayjs().format('YYYY-MM-DD')),
   });
 
   const totalRevenue = monthly.reduce((s, d) => s + d.totalRevenue, 0);

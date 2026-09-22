@@ -1,6 +1,7 @@
 import { Table } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { getInvoices } from '../api/invoices';
+import { useManagerPinStore } from '../store/managerPinStore';
 import { formatCurrency, formatTime, formatDateTime } from '../utils/format';
 import type { Invoice, OrderItem, PaymentMethod } from '../types';
 
@@ -64,7 +65,12 @@ function OrderItemsPanel({ orderItems }: { orderItems: OrderItem[] }) {
 }
 
 export default function InvoiceHistoryPage() {
-  const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: getInvoices });
+  // ManagerPinGate đảm bảo trang chỉ render khi đã có PIN hợp lệ.
+  const pin = useManagerPinStore((s) => s.pin) ?? '';
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => getInvoices(pin),
+  });
 
   return (
     <Table

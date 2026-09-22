@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { getStockImports, createStockImport, updateStockImport, voidStockImport } from '../api/stockImports';
 import { getProducts } from '../api/products';
-import type { StockImport } from '../types';
+import { useManagerPinStore } from '../store/managerPinStore';
+import type { StockImport, CreateStockImportRequest } from '../types';
 import { formatCurrency, formatDateTime } from '../utils/format';
 
 export default function StockImportsPage() {
@@ -14,8 +15,13 @@ export default function StockImportsPage() {
   const [viewTarget, setViewTarget] = useState<StockImport | null>(null);
   const [form] = Form.useForm();
   const qc = useQueryClient();
+  // ManagerPinGate đảm bảo trang chỉ render khi đã có PIN hợp lệ.
+  const pin = useManagerPinStore((s) => s.pin) ?? '';
 
-  const { data: stockImports = [], isLoading } = useQuery({ queryKey: ['stock-imports'], queryFn: getStockImports });
+  const { data: stockImports = [], isLoading } = useQuery({
+    queryKey: ['stock-imports'],
+    queryFn: () => getStockImports(pin),
+  });
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => getProducts() });
 
   const invalidateAll = () => {
@@ -25,7 +31,7 @@ export default function StockImportsPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: createStockImport,
+    mutationFn: (data: CreateStockImportRequest) => createStockImport(data, pin),
     onSuccess: () => {
       invalidateAll();
       setModalOpen(false);
@@ -36,7 +42,7 @@ export default function StockImportsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => updateStockImport(id, data),
+    mutationFn: ({ id, data }: { id: string; data: CreateStockImportRequest }) => updateStockImport(id, data, pin),
     onSuccess: () => {
       invalidateAll();
       setModalOpen(false);
@@ -48,7 +54,7 @@ export default function StockImportsPage() {
   });
 
   const voidMutation = useMutation({
-    mutationFn: voidStockImport,
+    mutationFn: (id: string) => voidStockImport(id, pin),
     onSuccess: () => {
       invalidateAll();
       message.success('Đã hủy phiếu nhập');

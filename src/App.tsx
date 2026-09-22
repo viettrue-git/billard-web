@@ -4,6 +4,7 @@ import { ConfigProvider, App as AntApp } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ManagerPinGate from './components/ManagerPinGate';
 import LoginPage from './pages/LoginPage';
 import TablesPage from './pages/TablesPage';
 import ReservationsPage from './pages/ReservationsPage';
@@ -36,10 +37,31 @@ export default function App() {
                 <Route index element={<TablesPage />} />
                 <Route path="reservations" element={<ReservationsPage />} />
                 <Route path="products" element={<ProductsPage />} />
-                <Route path="stock-imports" element={<StockImportsPage />} />
+                <Route
+                  path="stock-imports"
+                  element={
+                    <ManagerPinGate action="Quản lý nhập hàng">
+                      <StockImportsPage />
+                    </ManagerPinGate>
+                  }
+                />
                 <Route path="employees" element={<EmployeesPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="invoices" element={<InvoiceHistoryPage />} />
+                <Route
+                  path="reports"
+                  element={
+                    <ManagerPinGate action="Xem báo cáo doanh thu">
+                      <ReportsPage />
+                    </ManagerPinGate>
+                  }
+                />
+                <Route
+                  path="invoices"
+                  element={
+                    <ManagerPinGate action="Xem lịch sử thanh toán">
+                      <InvoiceHistoryPage />
+                    </ManagerPinGate>
+                  }
+                />
               </Route>
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

@@ -4,6 +4,10 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface ManagerPinStatus {
+  isConfigured: boolean;
+}
+
 export interface LoginResponse {
   token: string;
   username: string;
