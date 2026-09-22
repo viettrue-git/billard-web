@@ -51,9 +51,9 @@ export default function LoginPage() {
             </Button>
           </Form.Item>
         </Form>
-        <div style={{ textAlign: 'center', color: '#999', fontSize: 12 }}>
+        {/* <div style={{ textAlign: 'center', color: '#999', fontSize: 12 }}>
           Tài khoản mặc định: admin / Admin@123
-        </div>
+        </div> */}
       </Card>
     </div>
   );
