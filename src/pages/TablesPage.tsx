@@ -11,7 +11,7 @@ import dayjs from 'dayjs';
 import { getTables, openTable, closeTable, getTableSession, addOrder, updateOrderItem, deleteOrderItem, updateTablePrice } from '../api/tables';
 import { getProducts } from '../api/products';
 import type { BilliardTable, TableSession } from '../types';
-import { formatCurrency, calcCurrentAmount } from '../utils/format';
+import { formatCurrency, calcSessionFee, type SessionFee } from '../utils/format';
 import { useSignalR } from '../hooks/useSignalR';
 import { useAuthStore } from '../store/authStore';
 
@@ -36,10 +36,10 @@ export default function TablesPage() {
   const [closeModal, setCloseModal] = useState(false);
   const [orderModal, setOrderModal] = useState(false);
   const [currentSession, setCurrentSession] = useState<TableSession | null>(null);
-  const [timer, setTimer] = useState<Record<string, number>>({});
+  const [timer, setTimer] = useState<Record<string, SessionFee>>({});
   const [priceTarget, setPriceTarget] = useState<BilliardTable | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<{ tableNumber: string; finalAmount: number; paymentMethod: string } | null>(null);
-  const [paymentPreview, setPaymentPreview] = useState<{ tableAmount: number; foodAmount: number; discount: number; finalAmount: number; payment: string } | null>(null);
+  const [paymentPreview, setPaymentPreview] = useState<{ tableAmount: number; hourDiscount: number; foodAmount: number; discount: number; finalAmount: number; payment: string } | null>(null);
   const [openForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [priceForm] = Form.useForm();
@@ -59,17 +59,19 @@ export default function TablesPage() {
     queryFn: () => getProducts(),
   });
 
-  // Live timer for occupied tables
+  // Live timer for occupied tables (tinh ngay khi co du lieu, sau do cap nhat moi 10s)
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newTimer: Record<string, number> = {};
+    const tick = () => {
+      const newTimer: Record<string, SessionFee> = {};
       tables.forEach((t) => {
         if (t.status === 'Occupied' && t.currentSession) {
-          newTimer[t.id] = calcCurrentAmount(t.currentSession.openedAt, t.hourlyRate);
+          newTimer[t.id] = calcSessionFee(t.currentSession.openedAt, t.hourlyRate);
         }
       });
       setTimer(newTimer);
-    }, 10000);
+    };
+    tick();
+    const interval = setInterval(tick, 10000);
     return () => clearInterval(interval);
   }, [tables]);
 
@@ -137,7 +139,7 @@ export default function TablesPage() {
 
   const totalOccupied = tables.filter((t) => t.status === 'Occupied').length;
   const totalRevenue = tables.reduce((sum, t) => {
-    const tableAmount = timer[t.id] ?? t.currentSession?.currentAmount ?? 0;
+    const tableAmount = timer[t.id]?.amount ?? t.currentSession?.currentAmount ?? 0;
     return sum + tableAmount + (t.currentSession?.foodAmount ?? 0);
   }, 0);
 
@@ -159,7 +161,8 @@ export default function TablesPage() {
         <Row gutter={[16, 16]}>
           {tables.map((table) => {
             const cfg = statusConfig[table.status];
-            const tableAmount = timer[table.id] ?? table.currentSession?.currentAmount ?? 0;
+            const tableAmount = timer[table.id]?.amount ?? table.currentSession?.currentAmount ?? 0;
+            const hourDiscount = timer[table.id]?.discount ?? 0;
             const foodAmount = table.currentSession?.foodAmount ?? 0;
             const totalAmount = tableAmount + foodAmount;
             return (
@@ -198,6 +201,11 @@ export default function TablesPage() {
                         Bàn {formatCurrency(tableAmount)}
                         {foodAmount > 0 && ` · DV ${formatCurrency(foodAmount)}`}
                       </div>
+                      {hourDiscount > 0 && (
+                        <div style={{ fontSize: 11, color: '#3f8600', fontWeight: 500 }}>
+                          Đã giảm {formatCurrency(hourDiscount)}
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card>
@@ -259,7 +267,14 @@ export default function TablesPage() {
           <>
             <Row gutter={16}>
               <Col span={12}><Statistic title="Giờ mở" value={new Date(currentSession.openedAt).toLocaleTimeString('vi-VN')} /></Col>
-              <Col span={12}><Statistic title="Tiền bàn (tạm tính)" value={formatCurrency(timer[selectedTable?.id ?? ''] ?? 0)} /></Col>
+              <Col span={12}>
+                <Statistic title="Tiền bàn (tạm tính)" value={formatCurrency(timer[selectedTable?.id ?? '']?.amount ?? 0)} />
+                {(timer[selectedTable?.id ?? '']?.discount ?? 0) > 0 && (
+                  <Text style={{ fontSize: 12, color: '#3f8600' }}>
+                    Đã giảm {formatCurrency(timer[selectedTable?.id ?? '']!.discount)} (chơi trên 3 giờ)
+                  </Text>
+                )}
+              </Col>
             </Row>
             <Divider>Đồ uống & Thức ăn</Divider>
             <List
@@ -337,12 +352,14 @@ export default function TablesPage() {
                 block
                 icon={<DollarOutlined />}
                 onClick={() => {
-                  const tableAmount = timer[selectedTable?.id ?? ''] ?? 0;
+                  const fee = timer[selectedTable?.id ?? ''];
+                  const tableAmount = fee?.amount ?? 0;
+                  const hourDiscount = fee?.discount ?? 0;
                   const foodAmount = currentSession.orderItems.reduce((s, i) => s + i.total, 0);
                   const discount = closeForm.getFieldValue('discount') ?? 0;
                   const payment = closeForm.getFieldValue('payment') ?? 'Cash';
                   const finalAmount = tableAmount + foodAmount - discount;
-                  setPaymentPreview({ tableAmount, foodAmount, discount, finalAmount, payment });
+                  setPaymentPreview({ tableAmount, hourDiscount, foodAmount, discount, finalAmount, payment });
                 }}
               >
                 Thanh toán & Đóng bàn
@@ -381,6 +398,12 @@ export default function TablesPage() {
                 <Text type="secondary">Tiền bàn</Text>
                 <Text>{formatCurrency(paymentPreview.tableAmount)}</Text>
               </div>
+              {paymentPreview.hourDiscount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text type="secondary">Giảm giờ chơi (trên 3 giờ)</Text>
+                  <Text style={{ color: '#3f8600' }}>-{formatCurrency(paymentPreview.hourDiscount)}</Text>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: paymentPreview.discount > 0 ? 8 : 0 }}>
                 <Text type="secondary">Đồ uống & thức ăn</Text>
                 <Text>{formatCurrency(paymentPreview.foodAmount)}</Text>
